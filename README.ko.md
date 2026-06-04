@@ -53,11 +53,57 @@ cc -std=c99 -Wall -Wextra -pedantic main.c -o sym16_example
 `sym_encode`, `sym_decode`, `sym_type`, `sym_value` 같은 함수를 그대로
 사용합니다.
 
+그래서 테스트나 프로토타입 단계에서는 기본 `sym16.h`로 시작하면 됩니다.
+나중에 용도에 맞는 프로필이 확실해지면 include 한 줄만 `sym16_fast.h` 또는
+`sym16_compact.h`로 바꾸면 됩니다. 함수명은 그대로이고 내부 인코딩 전략만
+달라집니다. 단, compact 모드는 `sym_value()`의 숫자 의미를 의도적으로
+바꾸므로 raw value에 직접 의존하는 코드는 확인해야 합니다.
+
 | 헤더 | Value 의미 | 추천 상황 |
 | --- | --- | --- |
 | `sym16.h` | 원래 byte 값 저장. 예: `'a' == 97` | 학습, 디버깅, 문자열 복원, 가장 안전한 기본값 |
 | `sym16_fast.h` | `sym16.h`와 같지만 ASCII 분류에 lookup table 사용 | ASCII 중심 입력을 많이, 자주 인코딩할 때 |
 | `sym16_compact.h` | 타입 내부 인덱스 저장. 예: `'7' == 7`, `'c' == 2`, `'+' == 0` | Lexer/Parser에서 숫자값, 알파벳 인덱스, 연산자 인덱스를 바로 쓰고 싶을 때 |
+
+## 헤더 선택 가이드
+
+`sym16.h`가 맞는 경우:
+
+- 라이브러리를 처음 써보거나 프로토타입을 만들 때
+- 디버깅이 쉬운 구조가 필요할 때
+- `sym_value(sym_from_char('a'))`가 원래 byte 값인 `97`이기를 원할 때
+- ASCII 텍스트를 가장 덜 놀라운 방식으로 encode/decode하고 싶을 때
+- 아직 어떤 프로필을 골라야 할지 모르겠을 때
+
+`sym16_fast.h`가 맞는 경우:
+
+- 작은 static lookup table보다 인코딩 속도가 더 중요할 때
+- 입력이 대부분 ASCII일 때
+- 문자열이나 큰 버퍼를 반복해서 많이 인코딩할 때
+- scanner, validator, preprocessor처럼 입력 분류가 hot path일 때
+- `Value`는 `sym16.h`처럼 원래 byte 의미를 유지하고 싶을 때
+
+`sym16_compact.h`가 맞는 경우:
+
+- 이후 로직이 원래 byte보다 의미 있는 작은 값에 관심이 많을 때
+- 숫자를 바로 값으로 쓰고 싶을 때. 예: `'7' -> 7`
+- 알파벳을 인덱스로 쓰고 싶을 때. 예: `'c' -> 2`
+- 연산자를 ID로 쓰고 싶을 때. 예: `'+' -> 0`
+- Lexer/Parser 규칙에서 먼저 `Type`으로 분기하고, 그다음 타입 내부의 작은
+  `Value`를 쓰고 싶을 때
+
+빠른 예시:
+
+| 만들고 싶은 것 | 추천 헤더 | 이유 |
+| --- | --- | --- |
+| Sym16 첫 실험 | `sym16.h` | 가장 읽기 쉽고 덜 헷갈림 |
+| 디버그 dump 도구 | `sym16.h` | value가 원래 byte와 같음 |
+| ASCII 로그 스캐너 | `sym16_fast.h` | 반복 분류가 lookup으로 빨라질 수 있음 |
+| 소스 코드 Lexer | `sym16_fast.h` 또는 `sym16_compact.h` | 원시 스캔은 fast, 의미 기반 토큰 규칙은 compact가 유리 |
+| 계산기 Parser | `sym16_compact.h` | 숫자와 연산자가 작은 직접 값이 됨 |
+| 임베디드 고정 버퍼 Parser | `sym16_compact.h` | heap 없이 예측 가능하고 타입 내부 값이 작음 |
+| 일반 텍스트 저장 | 사용하지 말고 `char` | ASCII 저장 공간이 2배가 됨 |
+| 완전한 Unicode 텍스트 엔진 | 단독으로는 부족 | UTF-8/codepoint 계층이 먼저 필요 |
 
 ## 메모리 구조
 

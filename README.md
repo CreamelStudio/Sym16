@@ -54,6 +54,13 @@ Choose exactly one profile header per translation unit.
 All three expose the same API names, so normal code still calls
 `sym_encode`, `sym_decode`, `sym_type`, `sym_value`, and friends.
 
+That means you can start with the default `sym16.h` while writing tests and
+prototypes, then later switch only the include line to `sym16_fast.h` or
+`sym16_compact.h` when the right profile becomes clear. The function names stay
+the same; only the internal encoding strategy changes. For compact mode, check
+any code that directly depends on raw `sym_value()` numbers because those values
+are intentionally remapped.
+
 | Header | Value meaning | Best for |
 | --- | --- | --- |
 | `sym16.h` | Original byte value, such as `'a' == 97` | Learning, debugging, round-trip text, safest default |
@@ -62,6 +69,47 @@ All three expose the same API names, so normal code still calls
 
 Do not include more than one Sym16 profile in the same `.c` file. They share
 the same public API names by design.
+
+## Header Decision Guide
+
+Use `sym16.h` when:
+
+- You are learning the library or prototyping.
+- You want the easiest debugging experience.
+- You need `sym_value(sym_from_char('a'))` to be the original byte value `97`.
+- You want to encode and decode ASCII text with the least surprising behavior.
+- You are not sure which profile to choose yet.
+
+Use `sym16_fast.h` when:
+
+- Encoding speed is more important than a tiny static lookup table.
+- Your input is mostly ASCII.
+- You repeatedly encode many strings or large buffers.
+- You are building a scanner, validator, or preprocessor where input
+  classification is a hot path.
+- You still want `Value` to mean the original byte, just like `sym16.h`.
+
+Use `sym16_compact.h` when:
+
+- Later logic cares more about meaning than original byte values.
+- You want digit values directly, such as `'7' -> 7`.
+- You want alphabet indices directly, such as `'c' -> 2`.
+- You want operator IDs directly, such as `'+' -> 0`.
+- You are building lexer/parser rules that branch on `Type` first and then use
+  small category-local `Value` numbers.
+
+Quick examples:
+
+| Project | Recommended header | Why |
+| --- | --- | --- |
+| First Sym16 experiment | `sym16.h` | Most readable and least surprising |
+| Debug dump tool | `sym16.h` | Values match original bytes |
+| ASCII-heavy log scanner | `sym16_fast.h` | Repeated classification can benefit from lookup |
+| Source-code lexer | `sym16_fast.h` or `sym16_compact.h` | Fast for raw scanning, compact for semantic token rules |
+| Calculator parser | `sym16_compact.h` | Digits and operators become small direct values |
+| Embedded fixed-buffer parser | `sym16_compact.h` | No heap, predictable symbols, compact category values |
+| Plain text storage | None; use `char` | `Symbol` doubles ASCII storage |
+| Full Unicode text engine | None by itself | Needs a UTF-8/codepoint layer first |
 
 ## Memory Layout
 
