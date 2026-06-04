@@ -125,11 +125,61 @@ compact 버전에서는 항상 원래 ASCII 값이 들어가지는 않습니다.
 지원되는 ASCII 입력에 대해서는 `sym_decode`와 `sym_dump`가 보이는 문자를
 다시 복원합니다.
 
+## 커스텀 심볼
+
+Type `8`부터 `15`까지는 사용자 정의 심볼 영역입니다.
+
+```c
+SYM_CUSTOM0
+SYM_CUSTOM1
+SYM_CUSTOM2
+SYM_CUSTOM3
+SYM_CUSTOM4
+SYM_CUSTOM5
+SYM_CUSTOM6
+SYM_CUSTOM7
+```
+
+입력 문자 하나에서 바로 나온 값이 아니라, 파서가 중간에 끼워 넣는 의미 태그가
+필요할 때 쓰면 됩니다. 예를 들면 토큰 마커, 가상 구분자, 매크로 placeholder,
+AST 힌트, 도메인 전용 상태 같은 것들입니다.
+
+```c
+enum {
+    MY_TOKEN_IDENTIFIER = 1,
+    MY_TOKEN_NUMBER = 2
+};
+
+Symbol id = sym_make_custom(0, MY_TOKEN_IDENTIFIER);
+Symbol num = sym_make_custom(0, MY_TOKEN_NUMBER);
+
+if (sym_is_custom(id) && sym_custom_type(id) == 0) {
+    /* custom token 처리 */
+}
+```
+
+중요한 제한:
+
+- `sym_encode()`는 커스텀 심볼을 자동으로 만들지 않습니다.
+- `sym_make_custom(custom_type, value)`의 `custom_type`은 `0`부터 `7`까지입니다.
+- 잘못된 custom type을 넣으면 `SYM_NULL`을 반환합니다.
+- `value`는 여전히 12비트라 `0`부터 `4095`까지만 저장됩니다.
+- 커스텀 심볼은 텍스트가 아니므로 `sym_decode()`에서는 `?`로 나옵니다.
+- `sym_dump()`는 커스텀 값을 hex로 출력합니다. 예: `[CUSTOM0:0x0001]`
+
+이건 일부러 registry 시스템으로 만들지 않았습니다. 전역 이름 테이블, callback,
+동적 할당이 없습니다. 커스텀 value에 이름이 필요하다면 Lexer/Parser 계층에서
+따로 관리하는 편이 낫습니다.
+
 ## API
 
 - `sym_make(type, value)`
+- `sym_make_custom(custom_type, value)`
 - `sym_type(symbol)`
 - `sym_value(symbol)`
+- `sym_is_custom(symbol)`
+- `sym_is_custom_type(custom_type)`
+- `sym_custom_type(symbol)`
 - `sym_is_digit(symbol)`
 - `sym_is_upper(symbol)`
 - `sym_is_lower(symbol)`

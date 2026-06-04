@@ -42,12 +42,23 @@ enum {
     SYM_SPACE    = 4,
     SYM_OPERATOR = 5,
     SYM_SPECIAL  = 6,
-    SYM_HANGUL   = 7
+    SYM_HANGUL   = 7,
+    SYM_CUSTOM0  = 8,
+    SYM_CUSTOM1  = 9,
+    SYM_CUSTOM2  = 10,
+    SYM_CUSTOM3  = 11,
+    SYM_CUSTOM4  = 12,
+    SYM_CUSTOM5  = 13,
+    SYM_CUSTOM6  = 14,
+    SYM_CUSTOM7  = 15
 };
 
 #define SYM_TYPE_SHIFT 12u
 #define SYM_TYPE_MASK  ((uint16_t)0xF000u)
 #define SYM_VALUE_MASK ((uint16_t)0x0FFFu)
+#define SYM_CUSTOM_MIN ((uint8_t)SYM_CUSTOM0)
+#define SYM_CUSTOM_MAX ((uint8_t)SYM_CUSTOM7)
+#define SYM_CUSTOM_COUNT 8u
 
 #define SYM_TYPE(x)  ((uint8_t)((((Symbol)(x)) & SYM_TYPE_MASK) >> SYM_TYPE_SHIFT))
 #define SYM_VALUE(x) ((uint16_t)(((Symbol)(x)) & SYM_VALUE_MASK))
@@ -82,6 +93,30 @@ static inline uint8_t sym_type(Symbol s)
 static inline uint16_t sym_value(Symbol s)
 {
     return SYM_VALUE(s);
+}
+
+static inline bool sym_is_custom(Symbol s)
+{
+    uint8_t type = sym_type(s);
+    return type >= SYM_CUSTOM_MIN && type <= SYM_CUSTOM_MAX;
+}
+
+static inline bool sym_is_custom_type(uint8_t custom_type)
+{
+    return custom_type < SYM_CUSTOM_COUNT;
+}
+
+static inline uint8_t sym_custom_type(Symbol s)
+{
+    return sym_is_custom(s) ? (uint8_t)(sym_type(s) - SYM_CUSTOM_MIN) : 0u;
+}
+
+static inline Symbol sym_make_custom(uint8_t custom_type, uint16_t value)
+{
+    if (!sym_is_custom_type(custom_type)) {
+        return sym_make(SYM_NULL, 0);
+    }
+    return sym_make((uint8_t)(SYM_CUSTOM_MIN + custom_type), value);
 }
 
 static inline bool sym_is_digit(Symbol s)
@@ -445,6 +480,9 @@ static inline char sym_to_char(Symbol s)
         return '?';
     }
 #else
+    if (sym_is_custom(s)) {
+        return '?';
+    }
     return v <= 0xFFu ? (char)(uint8_t)v : '?';
 #endif
 }
@@ -468,6 +506,22 @@ static inline const char* sym_type_name(uint8_t type)
         return "SPECIAL";
     case SYM_HANGUL:
         return "HANGUL";
+    case SYM_CUSTOM0:
+        return "CUSTOM0";
+    case SYM_CUSTOM1:
+        return "CUSTOM1";
+    case SYM_CUSTOM2:
+        return "CUSTOM2";
+    case SYM_CUSTOM3:
+        return "CUSTOM3";
+    case SYM_CUSTOM4:
+        return "CUSTOM4";
+    case SYM_CUSTOM5:
+        return "CUSTOM5";
+    case SYM_CUSTOM6:
+        return "CUSTOM6";
+    case SYM_CUSTOM7:
+        return "CUSTOM7";
     default:
         return "UNKNOWN";
     }
@@ -657,7 +711,9 @@ static inline size_t sym_format(Symbol s, char* output, size_t max_output)
     pos = sym16_write_cstr(output, max_output, pos, sym_type_name(type));
     pos = sym16_write_char(output, max_output, pos, ':');
 
-    if (type == SYM_SPACE) {
+    if (sym_is_custom(s)) {
+        pos = sym16_write_u16_hex(output, max_output, pos, sym_value(s));
+    } else if (type == SYM_SPACE) {
         switch (c) {
         case ' ':
             pos = sym16_write_cstr(output, max_output, pos, "space");

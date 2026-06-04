@@ -130,11 +130,61 @@ small semantic index for digits, letters, spaces, and operators. `sym_decode`
 and `sym_dump` still reconstruct the visible character for supported ASCII
 input.
 
+## Custom Symbols
+
+Types `8` through `15` are reserved for user-defined symbols:
+
+```c
+SYM_CUSTOM0
+SYM_CUSTOM1
+SYM_CUSTOM2
+SYM_CUSTOM3
+SYM_CUSTOM4
+SYM_CUSTOM5
+SYM_CUSTOM6
+SYM_CUSTOM7
+```
+
+Use them when your parser needs symbols that do not come directly from one
+input character, such as token markers, virtual separators, macro placeholders,
+AST hints, or domain-specific states.
+
+```c
+enum {
+    MY_TOKEN_IDENTIFIER = 1,
+    MY_TOKEN_NUMBER = 2
+};
+
+Symbol id = sym_make_custom(0, MY_TOKEN_IDENTIFIER);
+Symbol num = sym_make_custom(0, MY_TOKEN_NUMBER);
+
+if (sym_is_custom(id) && sym_custom_type(id) == 0) {
+    /* handle custom token */
+}
+```
+
+Important limits:
+
+- `sym_encode()` does not create custom symbols automatically.
+- `sym_make_custom(custom_type, value)` accepts `custom_type` from `0` to `7`.
+- Invalid custom types return `SYM_NULL`.
+- `value` is still 12 bits, so it ranges from `0` to `4095`.
+- Custom symbols are not text; `sym_decode()` writes `?` for them.
+- `sym_dump()` prints custom values as hex, for example `[CUSTOM0:0x0001]`.
+
+This is intentionally not a registry system. There is no global name table, no
+callbacks, and no allocation. If you need names for custom values, keep that
+mapping in your lexer/parser layer.
+
 ## API
 
 - `sym_make(type, value)`
+- `sym_make_custom(custom_type, value)`
 - `sym_type(symbol)`
 - `sym_value(symbol)`
+- `sym_is_custom(symbol)`
+- `sym_is_custom_type(custom_type)`
+- `sym_custom_type(symbol)`
 - `sym_is_digit(symbol)`
 - `sym_is_upper(symbol)`
 - `sym_is_lower(symbol)`
